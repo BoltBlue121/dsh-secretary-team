@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-secretary-team",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "private": true,
   "license": "MIT",
   "engines": {
@@ -12,6 +12,7 @@
     "./boundary": "./preset/boundary.mjs",
     "./delegation": "./preset/delegation.mjs",
     "./secretary-gate": "./preset/secretary-gate.mjs",
+    "./readonly-gate": "./preset/readonly-gate.mjs",
     "./claude-code": "./host/claude-code.mjs",
     "./claude-only": "./host/claude-only.mjs",
     "./locale/*.json": "./locale/*.json",
@@ -25,7 +26,9 @@
     "./boundary/locale/*.json": "./locale/*.json",
     "./boundary/icon": "./icon.svg",
     "./secretary-gate/locale/*.json": "./locale/*.json",
-    "./secretary-gate/icon": "./icon.svg"
+    "./secretary-gate/icon": "./icon.svg",
+    "./readonly-gate/locale/*.json": "./locale/*.json",
+    "./readonly-gate/icon": "./icon.svg"
   },
   "files": ["preset", "host", "lib", "locale", "icon.svg", "cordis.patch.yml", "cordis.host.yml"],
   "scripts": {

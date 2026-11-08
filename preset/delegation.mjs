@@ -45,15 +45,18 @@
 // of dropped.
 import { createRequire } from 'node:module'
 import { appendFileSync, mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 export const name = 'secretary-team-delegation'
 export const inject = ['agentPresets', 'loader', 'agents']
 
-const LOG_PATH = 'G:/DSH-Platform-Hub/research/secretary-team-20261030/delegation-status.log'
+// Distribution default: an env override or a per-user temp file, never the
+// author's absolute workspace path.
+const LOG_PATH = process.env.DSH_SECRETARY_TEAM_LOG || join(tmpdir(), 'dsh-secretary-team', 'delegation-status.log')
 // Logged on activation so the log shows which revision the Host is running.
-const VERSION = '2.4.1'
+const VERSION = '2.5.0'
 
 // Claude is a product backend, not an AgentLoop model route. Never fall back
 // to spawn+Opus if the CLI backend is absent or fails.
@@ -169,6 +172,13 @@ export async function workerPresetChoices(agentPresets, fallback) {
   return ids.slice(0, MAX_PRESET_CHOICES)
 }
 
+// v2.5: the read-only roles (verify / research / plan) never take the specialized
+// preset list. Their read-only surface lives in their own presets (tool-fs
+// write/edit off, readonly-gate on the shell); `agent_preset: cordis` or
+// `standard` would swap all of that for a writable composition, so the
+// independent verifier could fix the code it is grading.
+export const READONLY_ROLE_PRESETS = Object.freeze([VERIFY_PRESET, RESEARCH_PRESET, PLAN_PRESET])
+
 export function toolsFor(preset, memberRoutes, presetChoices) {
   const tools = SURFACES.get(preset) ?? []
   const routed = !memberRoutes || (preset !== 'team-leader' && preset !== 'team-leader-cordis')
@@ -177,6 +187,7 @@ export function toolsFor(preset, memberRoutes, presetChoices) {
       agentOptions:memberRoutes.resolveMember(tool.toolName.slice('delegate_worker_'.length),tool.agentPreset,tool.agentOptions) })
   if (!presetChoices?.length) return routed
   return routed.map(tool => tool.backend || !tool.toolName.startsWith('delegate_worker_') ? tool
+    : READONLY_ROLE_PRESETS.includes(tool.agentPreset) ? { ...tool, allowedAgentPresets:[tool.agentPreset] }
     : { ...tool, allowedAgentPresets:[tool.agentPreset, ...presetChoices] })
 }
 
@@ -316,16 +327,21 @@ export function apply(ctx) {
       if (typeof ownerPreset === 'string' && ownerPreset.startsWith('team-leader')) delegated = true
       break
     }
-    if (!delegated) return
+    // v2.5: research and plan are read-only roles too, not only the verifier. A
+    // read-only role is a leaf whoever started it: the CLI leader's broker spawns
+    // it with the secretary as parent (the CLI process is not a DSH Agent), so the
+    // team-leader ownership test above would otherwise skip it.
+    const memberPreset = memberPresetOf(agent)
+    const readonlyRole = typeof memberPreset === 'string' && READONLY_ROLE_PRESETS.some((id) => memberPreset.startsWith(id))
+    if (!delegated && !readonlyRole) return
     flattened.add(agent)
-    const verifier = typeof memberPresetOf(agent) === 'string' && memberPresetOf(agent).startsWith(VERIFY_PRESET)
     let denied = 0
-    for (const name of verifier ? [...MEMBER_DENY, ...VERIFIER_DENY] : MEMBER_DENY) {
+    for (const name of readonlyRole ? [...MEMBER_DENY, ...VERIFIER_DENY] : MEMBER_DENY) {
       try { agent.ctx.tools.restrict({ deny: [name] }); denied += 1 } catch {
         // Not a global tool in this composition.
       }
     }
-    log(`member ${String(agent.id)} flattened: ${denied} tool(s) denied${verifier ? ' (verifier: write/edit denied)' : ''}`)
+    log(`member ${String(agent.id)} flattened: ${denied} tool(s) denied${readonlyRole ? ` (${memberPreset}: write/edit denied)` : ''}`)
   }
   const adopt = (agent, state) => {
     Object.defineProperty(state, 'owner', { value:generation, writable:true, configurable:true })

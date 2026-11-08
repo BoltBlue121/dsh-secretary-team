@@ -43,8 +43,21 @@ plugin_manager install_bundle target="<解压或下载后的路径>/local-dsh-se
 装好后在秘书会话里应看到：秘书只有只读工具、能派 `delegate_leader*`；领导能派
 `delegate_worker_*`；实现完成后领导必须派 `delegate_worker_verify` 做独立验收。
 
----
+---## v2.5.0 升级：审查修复（CLI 领导对齐团队、秘书不执行代码、验收只读不可绕过）
 
+- CLI 领导（`delegate_leader`）的 broker 增加 verify / research / plan 路由，固定落到 team-verifier / team-researcher / team-planner；`leaderPrompt` 改为 team-leader 人格（必派验收、不自判通过、反向反馈、不退回秘书）。
+- `secretary-gate` 拒绝 `cordis_define` / `cordis_run` / `cordis_stop` / `cordis_undefine`（tool-cordis 没有只读开关）。
+- verify / research / plan 不再接受 `agent_preset`；新增 `preset/readonly-gate.mjs` 挂在三个只读角色预设上，机械拒绝 shell 写文件。
+- 领导 → 秘书中途回传通道只做了设计，见 `docs/superpowers/specs/2026-11-09-secretary-team-route-options-design.md`。
+- 未提交、未发布、未 reload Host；运行时尚无 2.5.0 证据。
+
+## v2.4.1 升级：CLI runtime 可移植化（分发前置）
+
+- host/claude-code.mjs 的配置改为“本机可钉、默认可空”：xecutablePath 默认 `claude`、
+odeExecutablePath 默认 `node`、xpectedSha256 / configDir / aseUrl / credentialRef 可留空。留空时从 PATH 解析、跳过哈希校验、使用 Claude Code 自带登录；填了则保持原来的绝对路径 + SHA-256 + 网关 + 凭据行为。
+- lib/cc-provider.mjs：只有同时配置 aseUrl 与 credentialRef 才解析凭据并注入 ANTHROPIC_*；否则不注入、不强制凭据。CLAUDE_CONFIG_DIR 只在配置了 configDir 时设置。
+- 本地现网配置仍由 bundle 的 cordis.host.yml 显式钉住（绝对路径/哈希/网关），行为不变；公开分发包使用留空的通用配置。
+- 已发布：GitHub BoltBlue121/dsh-secretary-team tag 2.4.1（含 tarball）。
 # dsh-secretary-team
 
 ## v2.4 当前升级：完整团队编制 + DSH 标配 + 领导反向反馈

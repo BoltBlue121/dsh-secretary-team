@@ -12,20 +12,36 @@
 // - `write` / `edit` / `apply_patch` (and their `*_file` aliases) change files.
 // - shell verbs that write files (Set-Content, New-Item, Out-File, redirects…)
 //   would otherwise be the obvious bypass.
+// - v2.5: `cordis_define` / `cordis_run` / `cordis_stop` / `cordis_undefine`.
+//   The creation-mode secretary mounts `tool-cordis` for `cordis_inspect_*`, and
+//   that plugin has no inspect-only switch: the same row registers the tools
+//   that define and run dynamic Host/Client plugins, which is executing code.
 //
 // The refusal message names the legal routes (delegate_leader /
 // delegate_leader_astra / delegate_leader_deepseek) so a model that hits the
 // gate can correct itself in the same turn. Desks that are not the secretary
 // (leaders, workers) do not mount this plugin: workers must be able to write.
+// The read-only team roles reuse the same detection through `readonly-gate`.
 export const name = 'secretary-team-gate'
 export const inject = ['tools']
 
-const SHELL_TOOLS = new Set(['pwsh', 'bash'])
+export const SHELL_TOOLS = new Set(['pwsh', 'bash'])
 // Word-boundary verbs plus a file redirect. `2>&1` does not match because the
-// character after `>` is `&`.
+// character after `>` is `&`. Redirects into the null device (`2>$null`,
+// `>/dev/null`, `> nul`) discard output and are stripped before the test.
 const SHELL_WRITE =
   /\b(Set-Content|Add-Content|Out-File|Tee-Object|New-Item|Copy-Item|Move-Item|Rename-Item|Remove-Item|mkdir|md|rm)\b|>>?\s*[^\s&|]/i
-const FILE_TOOLS = new Set(['write', 'edit', 'apply_patch', 'write_file', 'edit_file'])
+const NULL_SINK = /\d?>>?\s*(?:\$null|\/dev\/null|nul)(?![\w.])/gi
+export const FILE_TOOLS = new Set(['write', 'edit', 'apply_patch', 'write_file', 'edit_file'])
+// Everything `tool-cordis` registers besides `cordis_inspect_*`.
+export const CORDIS_EXEC_TOOLS = new Set(['cordis_define', 'cordis_run', 'cordis_stop', 'cordis_undefine'])
+
+/** True when a shell command string would write files. `extra` adds patterns. */
+export function shellWrites(command, extra) {
+  if (typeof command !== 'string') return false
+  const stripped = command.replace(NULL_SINK, '')
+  return SHELL_WRITE.test(stripped) || (extra !== undefined && extra.test(stripped))
+}
 
 const WRITE_MESSAGE =
   'The secretary only interfaces with the user and the leader: do not write, edit or create files yourself. ' +
@@ -34,15 +50,16 @@ const WRITE_MESSAGE =
 const SHELL_MESSAGE =
   'The secretary does not run commands that write files: this shell command would write. ' +
   'Call delegate_leader / delegate_leader_astra / delegate_leader_deepseek with a full task brief.'
+const CORDIS_MESSAGE =
+  'The secretary does not define, run, stop or remove Cordis plugins: that executes code. ' +
+  'Only cordis_inspect_list / cordis_inspect_query are available to the secretary. ' +
+  'Call delegate_leader / delegate_leader_astra / delegate_leader_deepseek with a full task brief.'
 
 export function apply(ctx) {
   ctx.tools.guard((exec) => {
     if (FILE_TOOLS.has(exec?.name)) return WRITE_MESSAGE
-    if (SHELL_TOOLS.has(exec?.name)) {
-      const command = exec?.arguments?.command
-      if (typeof command === 'string' && SHELL_WRITE.test(command)) return SHELL_MESSAGE
-    }
+    if (CORDIS_EXEC_TOOLS.has(exec?.name)) return CORDIS_MESSAGE
+    if (SHELL_TOOLS.has(exec?.name) && shellWrites(exec?.arguments?.command)) return SHELL_MESSAGE
     return undefined
   })
 }
-
