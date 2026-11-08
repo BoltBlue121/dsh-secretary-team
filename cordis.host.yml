@@ -1,0 +1,39 @@
+# Host-owned product backend and run-scoped worker broker. No native Claude fallback.
+#
+# 所有本机相关配置都可留空：
+#   - executablePath / nodeExecutablePath 默认 'claude' / 'node'，从 PATH 解析
+#   - expectedSha256 留空 = 不校验哈希（需要钉版本时填 64 位 sha256）
+#   - configDir 留空 = 使用 Claude Code 默认配置目录（~/.claude）
+#   - baseUrl + credentialRef 留空 = 使用 Claude Code 自己的登录；填了则注入网关
+# 需要覆盖时，在 profile 的 cordis.patch.yml 里用相同 id 的 override 覆盖 config，
+# 不要改本文件。
+- insert:
+    - id: secretary-team-cc-runtime
+      name: '@local/dsh-secretary-team/claude-code'
+      config:
+        executablePath: 'claude'
+        expectedVersion: '2.1.198'
+        expectedSha256: ''
+        nodeExecutablePath: 'node'
+        configDir: ''
+        baseUrl: ''
+        credentialRef: ''
+        model: claude-opus-5-5
+        timeoutMs: 600000
+        maxBudgetUsd: 2
+        maxOutputBytes: 2000000
+        disposeGraceMs: 5000
+        maxConcurrent: 4
+        maxWorkers: 12
+    - id: secretary-team-delegation
+      name: '@local/dsh-secretary-team/delegation'
+    # Normal sessions get an explicit product delegation entry; team scopes mask
+    # and guard this name and keep only their fixed leader/member routes.
+    - id: secretary-team-cc-entry
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: secretary-cc-leader
+        toolName: delegate_claude_code
+        maxDepth: provider-managed
+    - id: secretary-team-claude-only
+      name: '@local/dsh-secretary-team/claude-only'

@@ -1,0 +1,42 @@
+{
+  "name": "@local/dsh-secretary-team",
+  "version": "2.4.1",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "dsh": ">=0.2.1-rc.3"
+  },
+  "type": "module",
+  "description": "Secretary teams with real Claude Code leaders, scoped DS/GPT workers and no native Claude fallback.",
+  "exports": {
+    "./boundary": "./preset/boundary.mjs",
+    "./delegation": "./preset/delegation.mjs",
+    "./secretary-gate": "./preset/secretary-gate.mjs",
+    "./claude-code": "./host/claude-code.mjs",
+    "./claude-only": "./host/claude-only.mjs",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./claude-code/locale/*.json": "./locale/*.json",
+    "./claude-code/icon": "./icon.svg",
+    "./claude-only/locale/*.json": "./locale/*.json",
+    "./claude-only/icon": "./icon.svg",
+    "./delegation/locale/*.json": "./locale/*.json",
+    "./delegation/icon": "./icon.svg",
+    "./boundary/locale/*.json": "./locale/*.json",
+    "./boundary/icon": "./icon.svg",
+    "./secretary-gate/locale/*.json": "./locale/*.json",
+    "./secretary-gate/icon": "./icon.svg"
+  },
+  "files": ["preset", "host", "lib", "locale", "icon.svg", "cordis.patch.yml", "cordis.host.yml"],
+  "scripts": {
+    "test": "node test/run.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": [
+        "./cordis.patch.yml",
+        "./cordis.host.yml"
+      ]
+    }
+  }
+}
