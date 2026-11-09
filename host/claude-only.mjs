@@ -3,6 +3,8 @@
 export const name='secretary-claude-code-only'
 export const inject=['llm']
 export function isNativeClaude(config){
+  // Explicit API models opt into their DSH provider; ordinary Claude stays CLI-only.
+  if(config?.provider!=='workbench-claude-cli' && /^\[api\]claude[-a-z0-9.]+$/i.test(String(config?.model??'')))return false
   return /claude|(?:^|[/_-])(?:opus|sonnet|haiku)(?:$|[/_-])/i.test(String(config?.model??'')) || /^anthropic$/i.test(String(config?.provider??''))
 }
 function assertRoute(config){

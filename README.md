@@ -17,7 +17,7 @@ plugin_manager install_bundle target="github:BoltBlue121/dsh-secretary-team#<com
 ### 方式 B：从 tarball 安装
 
 ```text
-plugin_manager install_bundle target="<解压或下载后的路径>/local-dsh-secretary-team-2.4.1.tgz"
+plugin_manager install_bundle target="<解压或下载后的路径>/local-dsh-secretary-team-2.6.0.tgz"
 ```
 
 ### 配置
@@ -43,13 +43,39 @@ plugin_manager install_bundle target="<解压或下载后的路径>/local-dsh-se
 装好后在秘书会话里应看到：秘书只有只读工具、能派 `delegate_leader*`；领导能派
 `delegate_worker_*`；实现完成后领导必须派 `delegate_worker_verify` 做独立验收。
 
----## v2.5.0 升级：审查修复（CLI 领导对齐团队、秘书不执行代码、验收只读不可绕过）
+---
+
+## v2.6.0 升级：秘书 ↔ 领导双向、多轮沟通
+
+- **原生领导**（`delegate_leader_astra` / `delegate_leader_deepseek`，spawn provider，本来就是 DSH continuable 子代理）：秘书和领导预设挂上官方 `@deepseek-ai/dsh-tool-subagent-control`（行 id `adjacent-messaging`，避开 Agent Teams 层对 `tool-subagent-control` 的禁用）。秘书在领导运行中或结束后都能 `send_message({ agent_id, message })` 继续说话、`interrupt_agent` 叫停；领导可以中途用 `send_message` 向秘书汇报或提问。投递对象只能是直接子代理或直接父代理，由 `ctx.subagents.sendMessage` 校验。
+- 新入口 `boundary-messaging`：与 `boundary` 相同，只多放行标准形态（参数为 `agent_id`）的 `send_message` / `interrupt_agent`；Agent Teams 形态（参数为 `target`）以及其它团队/派生工具仍拒绝。成员、验收、调研、方案预设保持严格的 `boundary`，并且不挂这个消息工具（团队保持扁平）。
+- **Claude CLI 领导**（`delegate_leader`）：外部进程按官方契约无法成为 continuable。实现方式改为：领导会话持久化（首轮用 `--session-id`，续接用 `--resume`），每轮成功交付末尾附一行「续接编号」。秘书再次调用 `delegate_leader`，第一行写 `[续接 <编号>]`，即可回到同一个 Claude 会话。续接只限发起它的秘书本人、只限相同 cwd、不能并发；编号未知时 fail-closed。编号写入续接台账，bundle 重载、桌面端重启后 7 天内仍可续接。worker / review 角色仍是一次性的。
+- 人格同步：秘书新增「跟领导来回沟通」一节，仍要求原话转达、不添油加醋；领导可以向秘书提问，CLI 领导被告知会被续接回来。
+- 独立审查修正（只读审查员发现 2 个 should-fix、5 个 nit，无 blocker）：
+  - CLI 领导派出的原生成员，在 DSH 里的直接父代理是秘书本人。为此，秘书预设改用 `boundary-secretary`，只放行秘书自己的领导，秘书不能绕过领导去指挥成员或验收员。领导预设仍用 `boundary-messaging`。
+  - **兼容旧对话**：什么算"自己的领导"有两种判断。一是本次运行中 `delegate_leader*` 返回的 id；二是 DSH 持久化的秘书会话 `subagentCatalog` 里登记的直接子代理，其 label 不是 broker 成员的 `CC worker …`（这个 label 从第一个 CLI broker `6f2dc47` 起就没变过）。所以 2.6.0 之前派出的原生领导、桌面端重启后的领导都能继续对话。读不到 catalog 时一律拒绝（fail-closed）。
+  - CLI 领导 2.6.0 之前的交付没有续接编号，人格要求改为重新派发自包含任务书。
+  - **续接跨重载/重启**：续接编号写入 CLI 运行日志旁的 `cc-continuations.json`（见 `lib/cc-ledger.mjs`）。文件只存 id、所属秘书会话、cwd 和时间，不存任务内容和凭据，写入是原子的。bundle 重载或桌面端重启后仍可 `[续接]`，仍限同一秘书、同一 cwd。7 天未用的编号失效并删除对应 transcript。卸载不再删除 transcript。
+  - 新增 `lib/cc-session.mjs` 清理领导会话的 transcript，只删 `<configDir>/projects/<dir>/<uuid>.jsonl` 和同名目录，不扫描其它会话。触发时机：首轮失败、被淘汰、卸载。Host 崩溃留下的孤儿文件不会自动清理。
+  - 续接数量上限：每个秘书 16 条、全局 64 条。
+  - `[续接]` 不在开头时报错 `CLI_CONTINUATION_MISPLACED`，不会悄悄当成新任务跑。
+  - 结果对象异常时也会释放续接锁。
+  - 续接后旧成员任务 id 失效，`leaderPrompt` 里已写明。
+  - 原生领导用 `send_message` 只发进展和提问，最终交付只在最后一条回复里写一次。
+- 测试：新增 `test/messaging.test.mjs`、`test/cc-session.test.mjs`；`cc-process` / `cc-provider` 测试补充续接与清理用例。`node test/run.mjs` 结果为 16/16。
+- 状态：**未提交、未 reload**。需要在 Host 重新加载后做实机验证。
+
+## v2.5.0 升级：审查修复（CLI 领导对齐团队、秘书不执行代码、验收只读不可绕过）
+
 
 - CLI 领导（`delegate_leader`）的 broker 增加 verify / research / plan 路由，固定落到 team-verifier / team-researcher / team-planner；`leaderPrompt` 改为 team-leader 人格（必派验收、不自判通过、反向反馈、不退回秘书）。
 - `secretary-gate` 拒绝 `cordis_define` / `cordis_run` / `cordis_stop` / `cordis_undefine`（tool-cordis 没有只读开关）。
 - verify / research / plan 不再接受 `agent_preset`；新增 `preset/readonly-gate.mjs` 挂在三个只读角色预设上，机械拒绝 shell 写文件。
 - 领导 → 秘书中途回传通道只做了设计，见 `docs/superpowers/specs/2026-11-09-secretary-team-route-options-design.md`。
-- 未提交、未发布、未 reload Host；运行时尚无 2.5.0 证据。
+- 2026-11-09 已发布 v2.5.0（GitHub release），Host 日志确认 `bundle 2.5.0` 已加载运行。
+
+
+> 分发版说明：委派状态日志、CLI 运行日志和 CLI 领导续接台账（`cc-continuations.json`）默认放在系统临时目录的 `dsh-secretary-team/` 下。可用环境变量 `DSH_SECRETARY_TEAM_LOG`、`DSH_SECRETARY_TEAM_CLI_LOG` 改位置（台账跟随 CLI 运行日志所在目录）。系统清理临时目录后，旧续接编号会失效，秘书会改为重新派发。
 
 ## v2.4.1 升级：CLI runtime 可移植化（分发前置）
 

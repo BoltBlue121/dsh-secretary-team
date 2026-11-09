@@ -1,11 +1,14 @@
 import { createRequire } from 'node:module'
 import { pathToFileURL, fileURLToPath } from 'node:url'
-import { isAbsolute, dirname } from 'node:path'
+import { isAbsolute, dirname, join } from 'node:path'
+import { homedir, tmpdir } from 'node:os'
 import { createReadStream, appendFileSync, mkdirSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { createClaudeProvider } from '../lib/cc-provider.mjs'
 import { runClaudeProcess } from '../lib/cc-process.mjs'
+import { discardClaudeSession } from '../lib/cc-session.mjs'
+import { createFileLedger } from '../lib/cc-ledger.mjs'
 
 // Share the exact running Host dependencies; do not require an ESM package
 // already being imported by Cordis during startup.
@@ -49,10 +52,15 @@ function validate(config){
 }
 export function apply(ctx,config){
   validate(config)
-  const logPath=fileURLToPath(new URL('../../../research/secretary-team-20261030/cli-runs.jsonl',import.meta.url))
+  // Distribution default: env override or a per-user temp dir (the continuation
+  // ledger lives next to it), never the author's workspace path.
+  const logPath=process.env.DSH_SECRETARY_TEAM_CLI_LOG||join(tmpdir(),'dsh-secretary-team','cli-runs.jsonl')
   const record=event=>{
     try{mkdirSync(dirname(logPath),{recursive:true});appendFileSync(logPath,JSON.stringify({at:new Date().toISOString(),...event})+'\n','utf8')}catch{/* metadata only */}
   }
+  // v2.6: CLI leader continuations survive reloads/restarts. Ids, owner session,
+  // cwd and timestamps only: no prompt text, no credentials.
+  const ledger=createFileLedger(join(dirname(logPath),'cc-continuations.json'))
   const verify=async()=>{
     // Recheck each launch: an auto/manual replacement at the same path must not
     // inherit a successful pin cached from an older executable. An empty pin
@@ -72,12 +80,16 @@ export function apply(ctx,config){
     runProcess:runClaudeProcess,
     spawn:spec=>ctx.subprocess.spawn(spec),
     startWorker:spec=>ctx.subagents.startActivation(spec),
+    // v2.6: leader transcripts live under the CLI config dir (stock: ~/.claude).
+    discardSession:id=>discardClaudeSession(config.configDir||join(homedir(),'.claude'),id),
+    ledger,
     record,
   }
   const providers=[
     ['secretary-cc-leader','leader','team-worker'],
     ['secretary-cc-leader-cordis','leader','team-worker-cordis'],
     ['secretary-cc-worker','worker','team-worker'],
+    ['secretary-cc-review','review','team-worker'],
   ].map(([name,role,workerPreset])=>createClaudeProvider({name,role,workerPreset,config,deps}))
   for(const provider of providers)ctx.subagents.registerProvider(provider)
   ctx.effect(()=>()=>Promise.all(providers.map(p=>p.dispose())))

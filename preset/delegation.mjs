@@ -56,7 +56,7 @@ export const inject = ['agentPresets', 'loader', 'agents']
 // author's absolute workspace path.
 const LOG_PATH = process.env.DSH_SECRETARY_TEAM_LOG || join(tmpdir(), 'dsh-secretary-team', 'delegation-status.log')
 // Logged on activation so the log shows which revision the Host is running.
-const VERSION = '2.5.0'
+const VERSION = '2.6.0'
 
 // Claude is a product backend, not an AgentLoop model route. Never fall back
 // to spawn+Opus if the CLI backend is absent or fails.
@@ -92,7 +92,8 @@ function workerTools(agentPreset) {
       agentPreset,
       agentOptions: { provider: 'deepseek-account', model: 'deepseek-flash', reasoningEffort: 'low' },
     },
-    { toolName: 'delegate_worker_stable', agentPreset, agentOptions: { provider: 'moeblack', model: 'gpt-6.1-sol' } },
+    // Banology Sol is available for implementation and independent acceptance.
+    { toolName: 'delegate_worker_stable', agentPreset, agentOptions: { provider: 'banology-gemini', model: 'gpt-6.1-sol' } },
     {
       toolName: 'delegate_worker_writing',
       agentPreset,
@@ -100,7 +101,9 @@ function workerTools(agentPreset) {
     },
     { toolName: 'delegate_worker_backend', agentPreset, agentOptions: ASTRA },
     { toolName: 'delegate_worker_frontend', backend: 'secretary-cc-worker' },
-    { toolName: 'delegate_worker_verify', agentPreset: VERIFY_PRESET, agentOptions: { provider: 'moeblack', model: 'gpt-6.1-sol' } },
+    { toolName: 'delegate_worker_review', backend: 'secretary-cc-review' },
+    // Separate read-only verifier session, using the available Banology Sol route.
+    { toolName: 'delegate_worker_verify', agentPreset: VERIFY_PRESET, agentOptions: { provider: 'banology-gemini', model: 'gpt-6.1-sol' } },
     { toolName: 'delegate_worker_research', agentPreset: RESEARCH_PRESET, agentOptions: { provider: 'banology-gemini', model: 'gemini-4-argon' } },
     { toolName: 'delegate_worker_plan', agentPreset: PLAN_PRESET, agentOptions: ASTRA },
   ]

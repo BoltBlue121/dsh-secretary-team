@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-secretary-team",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "private": true,
   "license": "MIT",
   "engines": {
@@ -10,6 +10,8 @@
   "description": "Secretary teams with real Claude Code leaders, scoped DS/GPT workers and no native Claude fallback.",
   "exports": {
     "./boundary": "./preset/boundary.mjs",
+    "./boundary-messaging": "./preset/boundary-messaging.mjs",
+    "./boundary-secretary": "./preset/boundary-secretary.mjs",
     "./delegation": "./preset/delegation.mjs",
     "./secretary-gate": "./preset/secretary-gate.mjs",
     "./readonly-gate": "./preset/readonly-gate.mjs",
@@ -25,6 +27,10 @@
     "./delegation/icon": "./icon.svg",
     "./boundary/locale/*.json": "./locale/*.json",
     "./boundary/icon": "./icon.svg",
+    "./boundary-messaging/locale/*.json": "./locale/*.json",
+    "./boundary-messaging/icon": "./icon.svg",
+    "./boundary-secretary/locale/*.json": "./locale/*.json",
+    "./boundary-secretary/icon": "./icon.svg",
     "./secretary-gate/locale/*.json": "./locale/*.json",
     "./secretary-gate/icon": "./icon.svg",
     "./readonly-gate/locale/*.json": "./locale/*.json",
